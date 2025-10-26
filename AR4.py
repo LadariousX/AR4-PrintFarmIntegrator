@@ -8305,7 +8305,7 @@ def calRobotAll():
     almStatusLab2.config(text="Calibration not supported in offline mode", style="Alarm.TLabel")
     return 
   ##### STAGE 1 ########
-  command = "LL"+"A"+str(CAL['J1CalStatVal'])+"B"+str(CAL['J2CalStatVal'])+"C"+str(CAL['J3CalStatVal'])+"D"+str(CAL['J4CalStatVal'])+"E"+str(CAL['J5CalStatVal'])+"F"+str(CAL['J6CalStatVal'])+"G"+str(CAL['J7CalStatVal'])+"H"+str(CAL['J8CalStatVal'])+"I"+str(CAL['J9CalStatVal'])+"J"+str(CAL['J1calOff'])+"K"+str(CAL['J2calOff'])+"L"+str(CAL['J3calOff'])+"M"+str(CAL['J4calOff'])+"N"+str(CAL['J5calOff'])+"O"+str(CAL['J6calOff'])+"P"+str(CAL['J7calOff'])+"Q"+str(CAL['J8calOff'])+"R"+str(CAL['J9calOff'])+"\n" 
+  command = "LL"+"A"+str(CAL['J1CalStatVal'].get())+"B"+str(CAL['J2CalStatVal'].get())+"C"+str(CAL['J3CalStatVal'].get())+"D"+str(CAL['J4CalStatVal'].get())+"E"+str(CAL['J5CalStatVal'].get())+"F"+str(CAL['J6CalStatVal'].get())+"G"+str(CAL['J7CalStatVal'].get())+"H"+str(CAL['J8CalStatVal'].get())+"I"+str(CAL['J9CalStatVal'].get())+"J"+str(CAL['J1calOff'])+"K"+str(CAL['J2calOff'])+"L"+str(CAL['J3calOff'])+"M"+str(CAL['J4calOff'])+"N"+str(CAL['J5calOff'])+"O"+str(CAL['J6calOff'])+"P"+str(CAL['J7calOff'])+"Q"+str(CAL['J8calOff'])+"R"+str(CAL['J9calOff'])+"\n" 
   RUN['ser'].write(command.encode())
   cmdSentEntryField.delete(0, 'end')
   cmdSentEntryField.insert(0,command)
@@ -8335,9 +8335,9 @@ def calRobotAll():
   pickle.dump(value,open("ErrorLog","wb")) 
   ##### STAGE 2 ########
   if (success):
-    CalStatVal2 = int(CAL['J1CalStatVal2'])+int(CAL['J2CalStatVal2'])+int(CAL['J3CalStatVal2'])+int(CAL['J4CalStatVal2'])+int(CAL['J5CalStatVal2'])+int(CAL['J6CalStatVal2'])
+    CalStatVal2 = int(CAL['J1CalStatVal2'].get())+int(CAL['J2CalStatVal2'].get())+int(CAL['J3CalStatVal2'].get())+int(CAL['J4CalStatVal2'].get())+int(CAL['J5CalStatVal2'].get())+int(CAL['J6CalStatVal2'].get())
     if(CalStatVal2>0):
-      command = "LL"+"A"+str(CAL['J1CalStatVal2'])+"B"+str(CAL['J2CalStatVal2'])+"C"+str(CAL['J3CalStatVal2'])+"D"+str(CAL['J4CalStatVal2'])+"E"+str(CAL['J5CalStatVal2'])+"F"+str(CAL['J6CalStatVal2'])+"G"+str(CAL['J7CalStatVal2'])+"H"+str(CAL['J8CalStatVal2'])+"I"+str(CAL['J9CalStatVal2'])+"J"+str(CAL['J1calOff'])+"K"+str(CAL['J2calOff'])+"L"+str(CAL['J3calOff'])+"M"+str(CAL['J4calOff'])+"N"+str(CAL['J5calOff'])+"O"+str(CAL['J6calOff'])+"P"+str(CAL['J7calOff'])+"Q"+str(CAL['J8calOff'])+"R"+str(CAL['J9calOff'])+"\n" 
+      command = "LL"+"A"+str(CAL['J1CalStatVal2'].get())+"B"+str(CAL['J2CalStatVal2'].get())+"C"+str(CAL['J3CalStatVal2'].get())+"D"+str(CAL['J4CalStatVal2'].get())+"E"+str(CAL['J5CalStatVal2'].get())+"F"+str(CAL['J6CalStatVal2'].get())+"G"+str(CAL['J7CalStatVal2'].get())+"H"+str(CAL['J8CalStatVal2'].get())+"I"+str(CAL['J9CalStatVal2'].get())+"J"+str(CAL['J1calOff'])+"K"+str(CAL['J2calOff'])+"L"+str(CAL['J3calOff'])+"M"+str(CAL['J4calOff'])+"N"+str(CAL['J5calOff'])+"O"+str(CAL['J6calOff'])+"P"+str(CAL['J7calOff'])+"Q"+str(CAL['J8calOff'])+"R"+str(CAL['J9calOff'])+"\n" 
       RUN['ser'].write(command.encode())
       cmdSentEntryField.delete(0, 'end')
       cmdSentEntryField.insert(0,command)
