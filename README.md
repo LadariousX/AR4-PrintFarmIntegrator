@@ -1,5 +1,5 @@
 # 🤖 AR4-MK3 Control Software  
-**Version 6.3.0 – January 2025**
+**Version 6.3.1 – January 2025**
 
 ![AR4 Logo](AR.png)
 

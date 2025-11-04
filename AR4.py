@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ############################################################################
-## Version AR4 6.3 #########################################################
+## Version AR4 6.3.1 #########################################################
 ############################################################################
 """ AR4 - robot control software
     Copyright (c) 2024, Chris Annin
@@ -67,6 +67,7 @@
   VERSION 6.2 9/12/25 changed bootstrap theme, xbox upgrade
   VERSION 6.2.1 9/24/25 fixed slider position update
   VERSION 6.3 10/8/25 changed COM entry to dropdown, added beta Linux support, added basic config module
+  VERSIOM 6.3.1 11/4/25 linux camera fixes
 '''
 ##########################################################################
 
@@ -196,7 +197,7 @@ os.chdir(DIR)
 RUN['cropping'] = False
 
 root = Tk()
-root.wm_title("AR4 Software Ver 6.3")
+root.wm_title("AR4 Software Ver 6.3.1")
 root.iconphoto(True, tk.PhotoImage(file="AR.png"))
 
 # Make headless RPi fit app on screen better
