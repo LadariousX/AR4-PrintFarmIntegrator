@@ -188,6 +188,7 @@ RUN = Config.RuntimeState # Not implemented yet
 if CE['Platform']['IS_WINDOWS']:
   from pygrabber.dshow_graph import FilterGraph
 
+camList = []
 
 robot.robot_set()
 
