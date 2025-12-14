@@ -198,6 +198,70 @@ os.chdir(DIR)
 RUN['cropping'] = False
 
 root = Tk()
+# Scrollable Frame Helper for Right frame
+class ScrollableFrame(ttk.Frame):
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+
+        canvas = tk.Canvas(self, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = ttk.Frame(canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox("all")
+            )
+        )
+
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Mouse wheel support (macOS + Windows)
+        self.scrollable_frame.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", lambda ev: canvas.yview_scroll(int(-1*(ev.delta/120)), "units")))
+        self.scrollable_frame.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+# delivers terminal feed to UI
+class TeeStdout:
+    def __init__(self, text_widget):
+        self.terminal = sys.stdout
+        self.text_widget = text_widget
+
+    def write(self, message):
+        # Write to terminal
+        self.terminal.write(message)
+
+        # Write to UI (thread-safe)
+        try:
+            self.text_widget.after(0, self._append, message)
+        except Exception:
+            pass
+
+    def _append(self, message):
+        self.text_widget.configure(state="normal")
+        self.text_widget.insert("end", message)
+        self.text_widget.see("end")
+        self.text_widget.configure(state="disabled")
+
+    def flush(self):
+        self.terminal.flush()
+
+def ui_call(fn, *args, **kwargs):
+  # Schedule a function to run on the Tk main thread
+  root.after(0, lambda: fn(*args, **kwargs))
+
+def ui_set_entry(entry, value: str):
+  def _set():
+    try:
+      if entry.get() != value:
+        entry.delete(0, 'end')
+        entry.insert(0, value)
+    except Exception:
+      pass
+  ui_call(_set)
+
 root.wm_title("AR4 Software Ver 6.3.1")
 root.iconphoto(True, tk.PhotoImage(file="AR.png"))
 
@@ -2362,8 +2426,8 @@ def runProg():
     while tab1.runTrue == 1:
       if (tab1.runTrue == 0):
         if (RUN['estopActive']):
-          almStatusLab.config(text="Estop Button was Pressed",  style="Alarm.TLabel")
-          almStatusLab2.config(text="Estop Button was Pressed",  style="Alarm.TLabel")
+          almStatusLab.config(text="Estop Button was Pressed 1",  style="Alarm.TLabel")
+          almStatusLab2.config(text="Estop Button was Pressed 2",  style="Alarm.TLabel")
         elif (RUN['posOutreach']):
           almStatusLab.config(text="Position Out of Reach",  style="Alarm.TLabel")
           almStatusLab2.config(text="Position Out of Reach",  style="Alarm.TLabel")  
@@ -2401,8 +2465,8 @@ def runProg():
         curRowEntryField.insert(0,"---") 
         tab1.runTrue = 0
         if (RUN['estopActive']):
-          almStatusLab.config(text="Estop Button was Pressed",  style="Alarm.TLabel")
-          almStatusLab2.config(text="Estop Button was Pressed",  style="Alarm.TLabel")
+          almStatusLab.config(text="Estop Button was Pressed 3",  style="Alarm.TLabel")
+          almStatusLab2.config(text="Estop Button was Pressed 4",  style="Alarm.TLabel")
         elif (RUN['posOutreach']):
           almStatusLab.config(text="Position Out of Reach",  style="Alarm.TLabel")
           almStatusLab2.config(text="Position Out of Reach",  style="Alarm.TLabel")    
@@ -2476,8 +2540,8 @@ def stopProg():
   lastProg = ""
   tab1.runTrue = 0
   if (RUN['estopActive']):
-    almStatusLab.config(text="Estop Button was Pressed",  style="Alarm.TLabel")
-    almStatusLab2.config(text="Estop Button was Pressed",  style="Alarm.TLabel")
+    almStatusLab.config(text="Estop Button was Pressed 5",  style="Alarm.TLabel")
+    almStatusLab2.config(text="Estop Button was Pressed 6",  style="Alarm.TLabel")
   elif (RUN['posOutreach']):
     almStatusLab.config(text="Position Out of Reach",  style="Alarm.TLabel")
     almStatusLab2.config(text="Position Out of Reach",  style="Alarm.TLabel")    
@@ -4019,16 +4083,17 @@ def executeRow():
     if (RUN['moveInProc'] == 1):
       RUN['moveInProc'] = 2
     command = "SS\n" 
-    cmdSentEntryField.delete(0, 'end')
-    cmdSentEntryField.insert(0,command)
+
+    ui_set_entry(cmdSentEntryField, command)
     RUN['ser'].write(command.encode())
     RUN['ser'].flushInput()
     time.sleep(.1)
-    response = str(RUN['ser'].readline().strip(),'utf-8')
+    response = str(RUN['ser'].readline().strip(), 'utf-8')
+
     if (response[:1] == 'E'):
-      ErrorHandler(response)   
+        ui_call(ErrorHandler, response)
     else:
-      displayPosition(response) 
+        ui_call(displayPosition, response)
 
   ##Camera On
   if(RUN['cmdType'] == "Cam On"):
@@ -7821,6 +7886,7 @@ def CreateProg():
   tab1.progView.delete(0,END)
   Prog = open(file_path,"rb")
   time.sleep(.1)
+
   for item in Prog:
     tab1.progView.insert(END,item)
   tab1.progView.pack()
@@ -7897,16 +7963,26 @@ def insertReturn():
 
 
 def openText():
-  file_path = path.relpath(ProgEntryField.get())
-  
+  file_path = os.path.abspath(ProgEntryField.get())
+
   match CE['Platform']['OS']:
     case 'Windows':
       os.startfile(file_path)
+
     case 'Linux':
       try:
         subprocess.run(["xdg-open", file_path], check=False)
       except FileNotFoundError:
-          logger.error("xdg-open not found. Please install xdg-utils package.")
+        logger.error("xdg-open not found. Please install xdg-utils package.")
+
+    case 'Darwin':  # macOS
+      # Try VS Code first
+      try:
+        subprocess.run(["code", file_path], check=False)
+      except FileNotFoundError:
+        # Fallback to default editor
+        subprocess.run(["open", file_path], check=False)
+
     case _:
       logger.error("Unsupported OS on File Open")
 
@@ -8904,10 +8980,36 @@ def CalRestPos():
   setStepMonitorsVR() 
 
 
+# --- UI/perf throttles ---
+_last_ui_pos_t = 0.0
+_last_ui_raw_t = 0.0
+_last_save_cal_t = 0.0
+
+def _set_entry_if_changed(entry, value: str):
+  try:
+    if entry.get() != value:
+      entry.delete(0, 'end')
+      entry.insert(0, value)
+  except Exception:
+    pass
 
 
 def displayPosition(response):
-  # global WC, RUN['VR_angles'] 
+  # global WC, RUN['VR_angles']
+
+  global _last_ui_pos_t, _last_ui_raw_t
+  now = time.time()
+
+  # Update the heavy UI fields at most 20 Hz
+  if now - _last_ui_pos_t < 0.05:
+    return
+  _last_ui_pos_t = now
+
+  # Update the raw RX field at most 2 Hz (it’s surprisingly expensive)
+  if now - _last_ui_raw_t > 0.5:
+    _last_ui_raw_t = now
+    _set_entry_if_changed(cmdRecEntryField, response)
+
 
   cmdRecEntryField.delete(0, 'end')
   cmdRecEntryField.insert(0,response)
@@ -8955,37 +9057,26 @@ def displayPosition(response):
   CAL['J7PosCur'] = response[J7PosIndex+1:J8PosIndex].strip();
   CAL['J8PosCur'] = response[J8PosIndex+1:J9PosIndex].strip();
   CAL['J9PosCur'] = response[J9PosIndex+1:].strip();
-  
-  J1curAngEntryField.delete(0, 'end')
-  J1curAngEntryField.insert(0,CAL['J1AngCur'])
-  J2curAngEntryField.delete(0, 'end')
-  J2curAngEntryField.insert(0,CAL['J2AngCur'])
-  J3curAngEntryField.delete(0, 'end')
-  J3curAngEntryField.insert(0,CAL['J3AngCur'])
-  J4curAngEntryField.delete(0, 'end')
-  J4curAngEntryField.insert(0,CAL['J4AngCur'])
-  J5curAngEntryField.delete(0, 'end')
-  J5curAngEntryField.insert(0,CAL['J5AngCur'])
-  J6curAngEntryField.delete(0, 'end')
-  J6curAngEntryField.insert(0,CAL['J6AngCur'])
-  XcurEntryField.delete(0, 'end')
-  XcurEntryField.insert(0,CAL['XcurPos'])
-  YcurEntryField.delete(0, 'end')
-  YcurEntryField.insert(0,CAL['YcurPos'])
-  ZcurEntryField.delete(0, 'end')
-  ZcurEntryField.insert(0,CAL['ZcurPos'])
-  RzcurEntryField.delete(0, 'end')
-  RzcurEntryField.insert(0,CAL['RzcurPos'])
-  RycurEntryField.delete(0, 'end')
-  RycurEntryField.insert(0,CAL['RycurPos'])
-  RxcurEntryField.delete(0, 'end')
-  RxcurEntryField.insert(0,CAL['RxcurPos'])
-  J7curAngEntryField.delete(0, 'end')
-  J7curAngEntryField.insert(0,CAL['J7PosCur'])
-  J8curAngEntryField.delete(0, 'end')
-  J8curAngEntryField.insert(0,CAL['J8PosCur'])
-  J9curAngEntryField.delete(0, 'end')
-  J9curAngEntryField.insert(0,CAL['J9PosCur'])
+
+  _set_entry_if_changed(J1curAngEntryField, CAL['J1AngCur'])
+  _set_entry_if_changed(J2curAngEntryField, CAL['J2AngCur'])
+  _set_entry_if_changed(J3curAngEntryField, CAL['J3AngCur'])
+  _set_entry_if_changed(J4curAngEntryField, CAL['J4AngCur'])
+  _set_entry_if_changed(J5curAngEntryField, CAL['J5AngCur'])
+  _set_entry_if_changed(J6curAngEntryField, CAL['J6AngCur'])
+
+  _set_entry_if_changed(XcurEntryField, CAL['XcurPos'])
+  _set_entry_if_changed(YcurEntryField, CAL['YcurPos'])
+  _set_entry_if_changed(ZcurEntryField, CAL['ZcurPos'])
+  _set_entry_if_changed(RzcurEntryField, CAL['RzcurPos'])
+  _set_entry_if_changed(RycurEntryField, CAL['RycurPos'])
+  _set_entry_if_changed(RxcurEntryField, CAL['RxcurPos'])
+
+  _set_entry_if_changed(J7curAngEntryField, CAL['J7PosCur'])
+  _set_entry_if_changed(J8curAngEntryField, CAL['J8PosCur'])
+  _set_entry_if_changed(J9curAngEntryField, CAL['J9PosCur'])
+
+
   J1jogslide.set(CAL['J1AngCur'])
   J2jogslide.set(CAL['J2AngCur'])
   J3jogslide.set(CAL['J3AngCur'])
@@ -8998,7 +9089,11 @@ def displayPosition(response):
   manEntryField.delete(0, 'end')
   manEntryField.insert(0,Debug)
 
-  save_calibration(CAL)
+  global _last_save_cal_t
+  if now - _last_save_cal_t > 2.0:  # save at most every 2 seconds
+    _last_save_cal_t = now
+    save_calibration(CAL)
+
   if (Flag != ""):
       ErrorHandler(Flag) 
   if (SpeedVioation=='1'):
@@ -9489,7 +9584,7 @@ def sync_fields_to_calibration():
   CAL['J7PosCur'] = J7curAngEntryField.get()
   CAL['J8PosCur'] = J8curAngEntryField.get()
   CAL['J9PosCur'] = J9curAngEntryField.get()
-  CAL['VisProg'] = visoptions.get()
+  # CAL['VisProg'] = visoptions.get()
   CAL['J1calOff']    = float(J1calOffEntryField.get())
   CAL['J2calOff']    = float(J2calOffEntryField.get())
   CAL['J3calOff']    = float(J3calOffEntryField.get())
@@ -9534,6 +9629,7 @@ def SaveAndApplyCalibration():
     updateParams()
     time.sleep(.1)
     calExtAxis()
+    logger.info("updated calibration data")
   except:
     logger.error("no serial connection with Teensy board")  
   save_calibration(CAL)
@@ -9649,7 +9745,7 @@ def ErrorHandler(response):
   elif (response[1:2] == 'B'):
     RUN['estopActive'] = TRUE
     stopProg()
-    message = "Estop Button was Pressed"
+    message = "Estop Button was Pressed 7"
     messages.append(message)
     alarm_message = message    
 
@@ -10706,7 +10802,7 @@ def GCplayProg(Filename):
     else:
       displayPosition(response)
       if (RUN['estopActive']):
-        GCalmStatusLab.config(text= "Estop Button was Pressed",  style="Alarm.TLabel")
+        GCalmStatusLab.config(text= "Estop Button was Pressed 8",  style="Alarm.TLabel")
       else:  
         GCalmStatusLab.config(text= "GCODE FILE COMPLETE",  style="Warn.TLabel") 
   GCplay = threading.Thread(target=GCthreadPlay)
@@ -11447,10 +11543,10 @@ insertBut.grid(row=1, column=1, sticky="ew", padx=2, pady=2)
 replaceBut = ttk.Button(manEntryFrame, text="Replace", command=manReplItem)
 replaceBut.grid(row=1, column=2, sticky="ew", padx=2, pady=2)
 
-openTextBut = ttk.Button(manEntryFrame, text="Open Text", command=openText)
+openTextBut = ttk.Button(manEntryFrame, text="Open in Editor", command=openText)
 openTextBut.grid(row=1, column=3, sticky="ew", padx=2, pady=2)
 
-reloadBut = ttk.Button(manEntryFrame, text="Reload", command=reloadProg)
+reloadBut = ttk.Button(manEntryFrame, text="Refresh", command=reloadProg)
 reloadBut.grid(row=1, column=4, sticky="ew", padx=2, pady=2)
 
 # Row 3: Position controls
@@ -11462,26 +11558,21 @@ reloadBut.grid(row=1, column=4, sticky="ew", padx=2, pady=2)
 # Duplicate buttons removed - now in proper containers
 
 # ============================================================================
-# RIGHT PANEL - Joint and Cartesian Controls
+# RIGHT PANEL - Joint and Cartesian Controls (Scrollable)
 # ============================================================================
-rightPanel = Frame(tab1)
+rightPanel = ScrollableFrame(tab1)
 rightPanel.grid(row=0, column=2, sticky="nsew", padx=2, pady=2)
 
-# Configure right panel grid
-rightPanel.grid_rowconfigure(0, weight=0)  # Joint controls - fixed height
-rightPanel.grid_rowconfigure(1, weight=0)  # Cartesian controls - fixed height
-rightPanel.grid_rowconfigure(2, weight=0)  # Tool controls - fixed height
-rightPanel.grid_rowconfigure(3, weight=0)  # Command builders - fixed height
-rightPanel.grid_rowconfigure(4, weight=0)  # Navigation - fixed height
-rightPanel.grid_rowconfigure(5, weight=0)  # Register commands - fixed height
-rightPanel.grid_rowconfigure(6, weight=0)  # Device commands - fixed height
-rightPanel.grid_rowconfigure(7, weight=1)  # Additional axes - compresses first when height reduced
-rightPanel.grid_rowconfigure(8, weight=2)  # Spacer - expands most
-rightPanel.grid_columnconfigure(0, weight=1)
-rightPanel.grid_columnconfigure(1, weight=1)
+# This is the actual container you will use from now on
+rightPanelInner = rightPanel.scrollable_frame
+
+# Configure inner grid (same layout rules as before)
+rightPanelInner.grid_columnconfigure(0, weight=1)
+rightPanelInner.grid_columnconfigure(1, weight=1)
+
 
 # Joint controls container (J1-J6)
-jointFrame = LabelFrame(rightPanel, text="Joint Control (J1-J6)", padding=5)
+jointFrame = LabelFrame(rightPanelInner, text="Joint Control (J1-J6)", padding=5)
 jointFrame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
 
 jointFrame.grid_columnconfigure(0, weight=1)
@@ -11727,7 +11818,7 @@ J6jogslide.config(command=J6sliderUpdate)
 J6jogslide.bind("<ButtonRelease-1>", J6sliderExecute)
 
 # Cartesian jog controls
-CartjogFrame = LabelFrame(rightPanel, text="Cartesian Control (X Y Z Rz Ry Rx)", padding=5)
+CartjogFrame = LabelFrame(rightPanelInner, text="Cartesian Control (X Y Z Rz Ry Rx)", padding=5)
 CartjogFrame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
 
 CartjogFrame.grid_columnconfigure(0, weight=1)
@@ -11893,7 +11984,7 @@ RxjogPosBut.bind("<ButtonPress>", SelRxjogPos)
 RxjogPosBut.bind("<ButtonRelease>", StopJog)
 
 # Tool frame controls
-TooljogFrame = LabelFrame(rightPanel, text="Tool Frame Control (Tx Ty Tz Trz Try Trx)", padding=5)
+TooljogFrame = LabelFrame(rightPanelInner, text="Tool Frame Control (Tx Ty Tz Trz Try Trx)", padding=5)
 TooljogFrame.grid(row=2, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
 
 TooljogFrame.grid_columnconfigure(0, weight=1)
@@ -12039,7 +12130,7 @@ TRxjogPosBut.bind("<ButtonRelease>", StopJog)
 
 
 # Extra axes (J7, J8, J9)
-extraAxesFrame = LabelFrame(rightPanel, text="Additional Axes", padding=5)
+extraAxesFrame = LabelFrame(rightPanelInner, text="Additional Axes", padding=5)
 extraAxesFrame.grid(row=7, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
 
 extraAxesFrame.grid_columnconfigure(0, weight=1)
@@ -12260,7 +12351,7 @@ J9jogslide.config(command=J9sliderUpdate)
 J9jogslide.bind("<ButtonRelease-1>", J9sliderExecute)
 
 # Command builders (IF, SET, WAIT - reordered and aligned)
-cmdFrame = LabelFrame(rightPanel, text="Command Builders", padding=5)
+cmdFrame = LabelFrame(rightPanelInner, text="Command Builders", padding=5)
 cmdFrame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=5, pady=(5, 2))
 
 # Configure columns for proper alignment
@@ -12357,7 +12448,7 @@ insertWaitBut = ttk.Button(cmdFrame, text="Insert WAIT CMD", command=WaitCMDInse
 insertWaitBut.grid(row=2, column=8, sticky="ew", padx=2, pady=2)
 
 # Navigation container (2x2 grid layout)
-navFrame = LabelFrame(rightPanel, text="Navigation", padding=5)
+navFrame = LabelFrame(rightPanelInner, text="Navigation", padding=5)
 navFrame.grid(row=4, column=0, columnspan=2, sticky="ew", padx=5, pady=(2, 5))
 
 # Configure 4 columns for 2x2 grid (button, entry, button, entry)
@@ -12393,7 +12484,7 @@ PlayGCEntryField = Entry(navFrame, width=8, justify="center")
 PlayGCEntryField.grid(row=1, column=3, sticky="ew", padx=2, pady=2)
 
 # Register Commands container
-regFrame = LabelFrame(rightPanel, text="Register Commands", padding=5)
+regFrame = LabelFrame(rightPanelInner, text="Register Commands", padding=5)
 regFrame.grid(row=5, column=0, columnspan=2, sticky="ew", padx=5, pady=(2, 5))
 
 # Configure columns for side-by-side layout
@@ -12439,7 +12530,7 @@ posRegBut = StorPosBut
 posRegEntryField = storPosNumEntryField
 
 # Device Commands container
-devFrame = LabelFrame(rightPanel, text="Device Commands", padding=5)
+devFrame = LabelFrame(rightPanelInner, text="Device Commands", padding=5)
 devFrame.grid(row=6, column=0, columnspan=2, sticky="ew", padx=5, pady=(2, 5))
 
 # Configure columns
@@ -12474,6 +12565,46 @@ auxPortEntryField.grid(row=1, column=4, sticky="ew", padx=2, pady=2)
 
 auxCharEntryField = Entry(devFrame, width=6, justify="center")
 auxCharEntryField.grid(row=1, column=5, sticky="ew", padx=2, pady=2)
+
+
+# ============================================================================
+# Program Output / Terminal Log (Bottom of Right Panel)
+# ============================================================================
+logFrame = LabelFrame(
+    rightPanelInner,
+    text="Program Output",
+    padding=5
+)
+logFrame.grid(
+    row=7,          # NEXT row after devFrame (devFrame is row=6)
+    column=0,
+    columnspan=2,
+    sticky="nsew",
+    padx=5,
+    pady=(2, 8)
+)
+
+# Text widget for log output
+logText = Text(
+    logFrame,
+    height=10,      # visible height; scrolling handles overflow
+    wrap="word",
+    state="disabled"
+)
+logText.pack(side="left", fill="both", expand=True)
+
+# Vertical scrollbar
+logScrollbar = ttk.Scrollbar(
+    logFrame,
+    orient="vertical",
+    command=logText.yview
+)
+logScrollbar.pack(side="right", fill="y")
+logText.configure(yscrollcommand=logScrollbar.set)
+# Redirect stdout and stderr to the UI log (while keeping terminal output)
+sys.stdout = TeeStdout(logText)
+sys.stderr = sys.stdout
+
 
 ##########################################################################
 ### END OF TAB 1 REFACTORING
