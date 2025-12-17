@@ -1,6 +1,8 @@
 # AR4-MK3 Control Software
 This fork is intended for use on my personal intel based macbook only. I began modifying this repo to create optimizations that I find benefited me. If you are planning on running this on your machine you may just prefer to take the `robot_kinematics.cpython-310-darwin.so` that I have compiled. run the original `AR4.py` with python 3.10 and install the pip reqs from this fork
  
+how to set up .env 
+uses commands like grep(check) and kill
 
 ### below is the remaining readme from the AR team that still protains. 
 

@@ -197,6 +197,89 @@ os.chdir(DIR)
 
 RUN['cropping'] = False
 
+# TCP socket
+import socket
+import json
+import threading
+import queue
+tcp_cmd_queue = queue.Queue()
+
+def ar4_tcp_server(host="127.0.0.1", port=5555):
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind((host, port))
+    srv.listen(1)
+
+    print(f"[AR4 TCP] Listening on {host}:{port}")
+
+    while True:
+        conn, addr = srv.accept()
+        print(f"[AR4 TCP] Client connected: {addr}")
+
+        with conn:
+            buf = ""
+            while True:
+                data = conn.recv(1024)
+                if not data:
+                    break
+
+                buf += data.decode()
+
+                while "\n" in buf:
+                    line, buf = buf.split("\n", 1)
+
+                    try:
+                        msg = json.loads(line)
+                        tcp_cmd_queue.put((msg, conn))
+                    except Exception as e:
+                        err = json.dumps({"error": str(e)}) + "\n"
+                        conn.sendall(err.encode())
+
+        print("[AR4 TCP] Client disconnected")
+
+def process_tcp_commands():
+    try:
+        while True:
+            msg, conn = tcp_cmd_queue.get_nowait()
+            response = handle_tcp_command(msg)
+            conn.sendall((json.dumps(response) + "\n").encode())
+    except queue.Empty:
+        pass
+
+    # run again
+    root.after(50, process_tcp_commands)
+
+def handle_tcp_command(msg):
+    cmd = msg.get("cmd")
+
+    try:
+        if cmd == "status":
+            return {
+                "ok": True,
+                "core": RUN.get("core", "UNKNOWN"),
+                "estop": RUN.get('estopActive', False),
+                "line": RUN.get("rowinproc", None)
+            }
+        elif cmd == "run_file": # loads and starts at 1st line
+            path = msg.get("path")
+            if not path:
+                return {"error": "missing path"}
+            loadProg(path) # /Users/layden/PycharmProjects/ar4-hmi/Programs/GrabBlock.ar4
+            runProg()
+            return {"ok": True}
+        elif cmd == "stop_prog": # finishes cmd holds and next line
+            stopProg()
+            return {"ok": True}
+        elif cmd == "res_prog": # runprog test rm later
+            runProg()
+            return {"ok": True}
+        else:
+            return {"error": "unknown command"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
 root = Tk()
 # Scrollable Frame Helper for Right frame
 class ScrollableFrame(ttk.Frame):
@@ -659,6 +742,15 @@ CAL['DisableWristRotVal'] = tk.IntVar(value=0)
 #J8NegLim = 0
 #J9PosLim = 0
 #J9NegLim = 0
+
+# Strart TCP server
+threading.Thread(
+    target=ar4_tcp_server,
+    daemon=True
+).start()
+
+root.after(50, process_tcp_commands)
+
 
 
 #############################################################################################
@@ -4217,7 +4309,7 @@ if CE['Platform']['IS_WINDOWS']:
       except Exception:
           pass
 
-  # ---------- Mode state (A=Joint, B=Cartesian) ----------
+  # ---------- Mode core (A=Joint, B=Cartesian) ----------
   RUN['_mainMode'] = 1
   def _show_mode_banner():
       try:
@@ -7836,32 +7928,44 @@ def Servo():
       f.write('\n')
     f.close()
 
-def loadProg():
-  if getattr(sys, 'frozen', False):
-    folder = os.path.dirname(sys.executable)
-  elif __file__:
-    folder = os.path.dirname(os.path.realpath(__file__))
-  #folder = os.path.dirname(os.path.realpath(__file__))
-  filetypes = (('robot program', '*.ar4'),("all files", "*.*"))
-  filename = fd.askopenfilename(title='Open files',initialdir=folder,filetypes=filetypes)
-  name = os.path.basename(filename)
-  ProgEntryField.delete(0, 'end')
-  ProgEntryField.insert(0,name)
-  tab1.progView.delete(0,END)
-  if filename == "":
-    return
-  try:
-    Prog = open(filename,"rb")
-    time.sleep(.1)
-    for item in Prog:
-      tab1.progView.insert(END,item)
-    tab1.progView.pack()
-    scrollbar.config(command=tab1.progView.yview)
-    save_calibration(CAL)
-  except FileNotFoundError:
-    logger.warning("File not found. Please check the file path and try again.")
-  except Exception as e:
-    logger.error(f"An error occurred: {e}")
+
+def loadProg(filenameIn=None):
+    if getattr(sys, 'frozen', False):
+        folder = os.path.dirname(sys.executable)
+    else:
+        folder = os.path.dirname(os.path.realpath(__file__))
+
+    # --- Determine filename ---
+    if filenameIn is None:
+        filetypes = (('robot program', '*.ar4'), ("all files", "*.*"))
+        filename = fd.askopenfilename(title='Open files',initialdir=folder,filetypes=filetypes)
+        if filename == "":
+            return
+    else:
+        filename = filenameIn
+
+    name = os.path.basename(filename)
+    ProgEntryField.delete(0, 'end')
+    ProgEntryField.insert(0, name)
+    tab1.progView.delete(0, END)
+
+    try:
+        logger.info(filename)
+        with open(filename, "rb") as Prog:
+            time.sleep(0.1)
+            for item in Prog:
+                tab1.progView.insert(END, item)
+
+        tab1.progView.pack()
+        scrollbar.config(command=tab1.progView.yview)
+        save_calibration(CAL)
+
+    except FileNotFoundError:
+        logger.warning("File not found. Please check the file path and try again.")
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+
+
 
 def callProg(name):  
   ProgEntryField.delete(0, 'end')
