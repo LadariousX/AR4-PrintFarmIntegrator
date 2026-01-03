@@ -3,6 +3,9 @@ This fork is intended for use on my personal intel based macbook only. I began m
  
 how to set up .env 
 uses commands like grep(check) and kill
+https://community.octoprint.org/t/setting-up-octoprint-on-macos/13425
+/path/to/OctoPrint/venv/bin/octoprint serve
+
 
 ### below is the remaining readme from the AR team that still protains. 
 

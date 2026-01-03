@@ -1,17 +1,18 @@
 package controllers
 
 import (
-	"PrintFarmIntegrator/core"
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"integrator/core"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -21,23 +22,47 @@ type OctoPrintClient struct {
 	client  *http.Client
 }
 
+func StartOctoPrintServ(appState *core.AppState, reset bool) error {
+	if reset {
+		appState.OctoStatus.Set("Octoprint status: restarting server")
+		fmt.Println("restarting Octoprint server")
+	}
+
+	octoprintPath := os.Getenv("OCTOPRINT_PATH_FULL")
+	out, _ := exec.Command("pgrep", "-f", "octoprint").Output()
+	instances := strings.Split(string(out), "\n")
+	if (len(instances)-1) != 1 || reset {
+		if !reset {
+			appState.OctoStatus.Set("Octoprint status: launching server")
+			fmt.Println("starting Octoprint server")
+		}
+		if (len(instances)-1) > 1 || reset {
+			for _, instance := range instances {
+				_ = exec.Command("kill", "-9", instance).Run()
+			}
+		}
+		cmd := exec.Command(octoprintPath, "serve")
+		//cmd.Stdout = os.Stdout
+		//cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			appState.OctoStatus.Set("Octoprint status: Error launching server, reattempting")
+			return fmt.Errorf("error launching new Octoprint server instance, %w", err)
+		}
+		log.Println("started new OctoPrint instance")
+		time.Sleep(15 * time.Second) // wait for octoprint to initialize before continuing.
+	}
+	return nil
+}
+
 // NewOctoPrint creates a new OctoPrint client
 func NewOctoPrint() *OctoPrintClient {
 	host, apiKey := os.Getenv("OCTOPRINT_HOSTNAME"), os.Getenv("OCTOPRINT_APP_API")
-	log.Printf("octoprint: Connecting to %s", host)
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, // ONLY for LAN / trusted devices
-		},
-		Proxy:             nil,
-		DisableKeepAlives: true,
-	}
+	host += ":5000"
 	return &OctoPrintClient{
 		baseURL: fmt.Sprintf("http://%s", host),
 		apiKey:  apiKey,
 		client: &http.Client{
-			Timeout:   30 * time.Second,
-			Transport: transport,
+			Timeout: 30 * time.Second,
 		},
 	}
 }
@@ -65,7 +90,7 @@ func (o *OctoPrintClient) makeRequest(method, endpoint string, body interface{})
 	if err != nil {
 		return nil, fmt.Errorf("octoprint: request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) { _ = Body.Close() }(resp.Body)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -129,14 +154,12 @@ func (o *OctoPrintClient) UploadFile(localPath string) error {
 		return fmt.Errorf("octoprint: upload failed with status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	log.Println("octoprint: Upload complete")
+	//log.Println("octoprint: Upload complete")
 	return nil
 }
 
 // StartPrint starts printing a file
 func (o *OctoPrintClient) StartPrint(filename string) error {
-	log.Printf("octoprint: Starting print: %s", filename)
-
 	payload := map[string]interface{}{
 		"command": "select",
 		"print":   true,
@@ -205,8 +228,6 @@ func (o *OctoPrintClient) GetJobResp() (*core.JobResponse, error) {
 		return nil, fmt.Errorf("octoprint: failed to get status: %v", err)
 	}
 
-	log.Printf("octoprint: Raw job response: %s", string(data))
-
 	var status core.JobResponse
 	if err := json.Unmarshal(data, &status); err != nil {
 		return nil, fmt.Errorf("octoprint: failed to parse status: %v", err)
@@ -221,8 +242,6 @@ func (o *OctoPrintClient) GetPrinterResp() (*core.PrinterResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("octoprint: failed to get printer state: %v", err)
 	}
-
-	log.Printf("octoprint: Raw printer response: %s", string(data))
 
 	var state core.PrinterResponse
 	if err := json.Unmarshal(data, &state); err != nil {

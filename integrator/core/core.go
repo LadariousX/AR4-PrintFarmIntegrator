@@ -3,17 +3,25 @@ package core
 import "fyne.io/fyne/v2/data/binding"
 
 type AppState struct {
-	ArmStatus     binding.String
-	PrinterStatus binding.String
-	CycleStatus   binding.String
+	ArmStatus   binding.String
+	OctoStatus  binding.String
+	PrintStatus binding.Untyped
+	CycleStatus binding.String
 }
 
 type RCtrl struct {
 	AR4CtrlReset chan struct{}
 	Start        chan struct{}
-	Pause        chan struct{}
 	Stop         chan struct{}
-	SetRobotProg chan string
+	Load         chan struct{}
+	SetProg      chan string
+	SetProgIndex chan int
+	State        chan RobotState
+}
+
+type RobotState struct {
+	State string
+	Line  int
 }
 
 type Position struct {
@@ -23,15 +31,38 @@ type Position struct {
 }
 
 type PCtrl struct {
-	StartPrint             chan string
+	OctoprintReset         chan struct{}
+	StartPrint             chan struct{}
 	PausePrint             chan struct{}
 	ResumePrint            chan struct{}
 	StopPrint              chan struct{}
-	PrinterStatus          chan PrinterResponse
-	JobStatus              chan JobResponse
-	MovePrinter            chan Position
-	DisablePrinterSteppers chan struct{}
 	EnablePrinterSteppers  chan struct{}
+	DisablePrinterSteppers chan struct{}
+	UploadFile             chan struct{}
+
+	SetPrinterProg chan string
+	PrinterStatus  chan PrinterResponse
+	JobStatus      chan JobResponse
+	MovePrinter    chan Position
+}
+
+type JobCtrl struct {
+	StartJob        chan struct{}
+	PauseJob        chan struct{}
+	StopJob         chan struct{}
+	IncrementRepeat chan struct{}
+	DecrementRepeat chan struct{}
+	IsPaused        binding.Bool
+	LogOutput       binding.String
+	LogWriter       *LogWriter
+
+	RepetitionCount    binding.Int
+	CurrentCycle       binding.Int
+	RemainingCycles    binding.Int
+	CycleTimeRemaining binding.String
+	JobTimeRemaining   binding.String
+	CycleStage         binding.String
+	Progress           binding.Float
 }
 
 type JobResponse struct {

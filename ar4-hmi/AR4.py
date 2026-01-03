@@ -183,7 +183,7 @@ global Config, CE, CAL, RUN
 Config = AR4_Configuration()
 CE = Config.Environment
 CAL = Config.Calibration
-RUN = Config.RuntimeState # Not implemented yet
+RUN = {}
 
 if CE['Platform']['IS_WINDOWS']:
   from pygrabber.dshow_graph import FilterGraph
@@ -251,28 +251,50 @@ def process_tcp_commands():
 
 def handle_tcp_command(msg):
     cmd = msg.get("cmd")
-
     try:
         if cmd == "status":
+            # Determine state: estop, running, or standby
+            if RUN.get('estopActive', False): # could be backwards.
+                state = "estop"
+            elif RUN.get('progRunning', False):
+                state = "running"
+            else:
+                state = "Operational"
+
             return {
                 "ok": True,
-                "core": RUN.get("core", "UNKNOWN"),
-                "estop": RUN.get('estopActive', False),
+                "state": state,
                 "line": RUN.get("rowinproc", None)
             }
-        elif cmd == "run_file": # loads and starts at 1st line
+
+        elif cmd == "load_prog":  # loads program and indexes to 0
             path = msg.get("path")
             if not path:
                 return {"error": "missing path"}
-            loadProg(path) # /Users/layden/PycharmProjects/ar4-hmi/Programs/GrabBlock.ar4
+            loadProg(path)
+            return {"ok": True}
+
+        elif cmd == "run_prog": # start/resume prog from current pos
             runProg()
             return {"ok": True}
+
         elif cmd == "stop_prog": # finishes cmd holds and next line
             stopProg()
             return {"ok": True}
-        elif cmd == "res_prog": # runprog test rm later
-            runProg()
+
+        elif cmd == "set_index": # stops then changes program index
+            index = msg.get("index")
+            if not index:
+                return{"error":"no index to set"}
+            stopProg()
+            RUN['rowinproc'] = int(index)
             return {"ok": True}
+
+        elif cmd == "calibrate":
+            insCalibrate()
+            return {"ok": True}
+            # TODO: do actual error handeling
+
         else:
             return {"error": "unknown command"}
 

@@ -1,10 +1,10 @@
 ##BEGINNING OF PROGRAM##
-Calibrate Robot
+##Calibrate Robot##
 ##home##
 Move J [*] X 286.779 Y 0.063 Z 433.770 Rz 0.018 Ry 180.000 Rx 0.016 J7 0.00 J8 0.00 J9 0.00 Sp 25 Ac 15 Dc 15 Rm 80 $ F
 Servo number 0 to position: 46
 
-##grab approch##
+##grab approach##
 Move J [*] X 48.610 Y 405.237 Z 181.592 Rz 128.649 Ry -117.562 Rx 0.117 J7 0.00 J8 0.00 J9 0.00 Sp 25 Ac 15 Dc 15 Rm 80 $ F
 
 ##lower##
@@ -17,8 +17,11 @@ Move J [*] X 48.570 Y 405.085 Z 154.130 Rz 128.449 Ry -117.684 Rx 0.143 J7 0.00 
 ##back up##
 Move J [*] X 48.556 Y 300.377 Z 307.167 Rz 86.556 Ry -151.479 Rx 2.866 J7 0.00 J8 0.00 J9 0.00 Sp 25 Ac 15 Dc 15 Rm 80 $ F
 
-##drop approch##
+##drop approach##
 Move J [*] X -265.236 Y 360.197 Z 306.985 Rz 86.428 Ry -151.521 Rx 2.969 J7 0.00 J8 0.00 J9 0.00 Sp 25 Ac 15 Dc 15 Rm 80 $ F
 Servo number 0 to position: 46
 
 Move J [*] X 286.779 Y 0.063 Z 433.770 Rz 0.018 Ry 180.000 Rx 0.016 J7 0.00 J8 0.00 J9 0.00 Sp 25 Ac 15 Dc 15 Rm 80 $ F
+Calibrate Robot
+Calibrate Robot
+Calibrate Robot
